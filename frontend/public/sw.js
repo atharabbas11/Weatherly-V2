@@ -1,3 +1,5 @@
+const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
 // Add this to handle periodic background sync
 self.addEventListener('periodicsync', (event) => {
   if (event.tag === 'weather-update') {
@@ -12,6 +14,12 @@ self.addEventListener('periodicsync', (event) => {
 
 // Enhanced push handler
 self.addEventListener('push', (event) => {
+  if (isSafari) {
+    // Safari-specific handling
+    console.log('Push received in Safari - limited functionality');
+    return;
+  }
+  
   const payload = event.data?.json() || {
     title: 'Weather Update',
     body: 'New weather information available',
