@@ -155,45 +155,90 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
     subscribedLocation: null
   });
 
-  const renderNotificationToggle = () => {
-  if (!('Notification' in window)) return null;
+//   const renderNotificationToggle = () => {
+//   if (!('Notification' in window)) return null;
 
-  const currentLocation = `${location.name},${location.region},${location.country}`.replace(/\s*,\s*/g, ',');
-  const isSubscribedToCurrentLocation = subscriptionData.isSubscribed && 
-    subscriptionData.subscribedLocation === currentLocation;
+//   const currentLocation = `${location.name},${location.region},${location.country}`.replace(/\s*,\s*/g, ',');
+//   const isSubscribedToCurrentLocation = subscriptionData.isSubscribed && 
+//     subscriptionData.subscribedLocation === currentLocation;
 
-  return (
-    <div className="notification-controls bg-blue-50 dark:bg-gray-700 p-3 rounded-lg border border-blue-200 dark:border-gray-600">
-      <button
-        onClick={isSubscribedToCurrentLocation ? unsubscribeFromNotifications : subscribeToNotifications}
-        className={`notification-btn flex items-center justify-center w-full py-2 px-4 rounded-md transition-colors ${
-          isSubscribedToCurrentLocation 
-            ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
-            : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800'
-        }`}
-      >
-        {isSubscribedToCurrentLocation ? (
-          <>
-            <span className="icon mr-2">🔔</span>
-            <span className="font-medium">Receiving Updates for {location.name}</span>
-          </>
-        ) : (
-          <>
-            <span className="icon mr-2">🔕</span>
-            <span className="font-medium">Get 2-Hour Weather Alerts</span>
-          </>
-        )}
-      </button>
+//   return (
+//     <div className="notification-controls bg-blue-50 dark:bg-gray-700 p-3 rounded-lg border border-blue-200 dark:border-gray-600">
+//       <button
+//         onClick={isSubscribedToCurrentLocation ? unsubscribeFromNotifications : subscribeToNotifications}
+//         className={`notification-btn flex items-center justify-center w-full py-2 px-4 rounded-md transition-colors ${
+//           isSubscribedToCurrentLocation 
+//             ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+//             : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800'
+//         }`}
+//       >
+//         {isSubscribedToCurrentLocation ? (
+//           <>
+//             <span className="icon mr-2">🔔</span>
+//             <span className="font-medium">Receiving Updates for {location.name}</span>
+//           </>
+//         ) : (
+//           <>
+//             <span className="icon mr-2">🔕</span>
+//             <span className="font-medium">Get 2-Hour Weather Alerts</span>
+//           </>
+//         )}
+//       </button>
       
-      {isSubscribedToCurrentLocation && (
-        <div className="notification-info mt-2 text-center text-sm text-gray-600 dark:text-gray-300">
-          <p>Next update at <span className="font-medium">{getNextNotificationTime()}</span></p>
-          <p>Location: <span className="font-medium">{location.name}, {location.region}</span></p>
+//       {isSubscribedToCurrentLocation && (
+//         <div className="notification-info mt-2 text-center text-sm text-gray-600 dark:text-gray-300">
+//           <p>Next update at <span className="font-medium">{getNextNotificationTime()}</span></p>
+//           <p>Location: <span className="font-medium">{location.name}, {location.region}</span></p>
+//         </div>
+//       )}
+//     </div>
+//   );
+// };
+
+  const renderNotificationToggle = () => {
+      if (!('Notification' in window)) return null;
+    
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const iosStatus = isIOS ? checkIOSNotificationStatus() : null;
+      
+      const currentLocation = `${location.name},${location.region},${location.country}`.replace(/\s*,\s*/g, ',');
+      const isSubscribedToCurrentLocation = isIOS
+        ? iosStatus?.isSubscribed
+        : subscriptionData.isSubscribed && 
+          subscriptionData.subscribedLocation === currentLocation;
+    
+      return (
+        <div className="notification-controls bg-blue-50 dark:bg-gray-700 p-3 rounded-lg border border-blue-200 dark:border-gray-600">
+          <button
+            onClick={isSubscribedToCurrentLocation ? unsubscribeFromNotifications : subscribeToNotifications}
+            className={`notification-btn flex items-center justify-center w-full py-2 px-4 rounded-md transition-colors ${
+              isSubscribedToCurrentLocation 
+                ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
+                : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800'
+            }`}
+          >
+            {isSubscribedToCurrentLocation ? (
+              <>
+                <span className="icon mr-2">🔔</span>
+                <span className="font-medium">Receiving Updates for {location.name}</span>
+              </>
+            ) : (
+              <>
+                <span className="icon mr-2">🔕</span>
+                <span className="font-medium">Get 2-Hour Weather Alerts</span>
+              </>
+            )}
+          </button>
+          
+          {isSubscribedToCurrentLocation && (
+            <div className="notification-info mt-2 text-center text-sm text-gray-600 dark:text-gray-300">
+              <p>Next update at <span className="font-medium">{getNextNotificationTime()}</span></p>
+              <p>Location: <span className="font-medium">{location.name}, {location.region}</span></p>
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
-};
+      );
+    };
 
   const subscribeToNotifications = async () => {
     try {
@@ -202,13 +247,21 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
       // iOS check
       const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-      if (isIOS) {
-        // iOS requires this special permission flow
+       if (isIOS) {
+        // iOS-specific flow
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-          throw new Error('Permission not granted');
+        if (permission === 'granted') {
+          toast.success('Notifications enabled in Safari browser');
+          // For iOS, we'll use periodic checks instead of push
+          localStorage.setItem('iosNotificationLocation', 
+            `${location.name},${location.region},${location.country}`);
+          
+          setSubscriptionData({
+            isSubscribed: true,
+            subscription: null,
+            subscribedLocation: `${location.name},${location.region},${location.country}`
+          });
         }
-        toast.success('Notifications enabled! You will receive alerts in Safari.');
         return;
       }
 
@@ -277,6 +330,19 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
     }
   };
 
+  // Add this new function for iOS status checks
+  const checkIOSNotificationStatus = () => {
+    if (!/iPad|iPhone|iPod/.test(navigator.userAgent)) return false;
+    
+    const savedLocation = localStorage.getItem('iosNotificationLocation');
+    const currentLocation = `${location.name},${location.region},${location.country}`;
+    
+    return {
+      isSubscribed: savedLocation === currentLocation,
+      subscribedLocation: savedLocation
+    };
+  };
+  
   // Enhanced unsubscribe function
   const unsubscribeFromNotifications = async () => {
     try {
