@@ -130,22 +130,48 @@ app.post('/api/subscribe/check', async (req, res) => {
   }
 });
 
+// Improved timezone handling functions
 function getLocalHour(timezone) {
-  return new Date().toLocaleString('en-US', {
-    hour: '2-digit',
-    hour12: false,
-    timeZone: timezone
-  }).split(' ')[0];
+  try {
+    const now = new Date();
+    return parseInt(now.toLocaleString('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      hour12: false
+    }));
+  } catch (err) {
+    console.error(`Error getting local hour for ${timezone}:`, err);
+    return new Date().getUTCHours();
+  }
 }
 
 function calculateNextNotificationTime(now, timezone) {
-  const localHour = parseInt(getLocalHour(timezone));
+  const localHour = getLocalHour(timezone);
   const next = new Date(now);
   
+  // Calculate next even hour in local time
   const nextNotificationHour = localHour + (2 - (localHour % 2));
-  next.setHours(nextNotificationHour, 0, 0, 0);
   
-  return next;
+  // Convert local time to UTC for storage
+  const utcDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+  utcDate.setHours(nextNotificationHour, 0, 0, 0);
+  return utcDate;
+}
+
+// Updated notification time formatting
+function formatLocalTime(dateStr, timezone) {
+  try {
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  } catch (err) {
+    console.error('Error formatting time:', err);
+    return dateStr;
+  }
 }
 
 async function sendWeatherUpdateForSubscription(subscription, location) {
@@ -153,30 +179,24 @@ async function sendWeatherUpdateForSubscription(subscription, location) {
     const weatherData = await fetchWeatherData(location);
     const timezone = weatherData.location.tz_id;
     
+    // Get current time in location's timezone
     const now = new Date();
     const localHour = parseInt(now.toLocaleString('en-US', {
+      timeZone: timezone,
       hour: '2-digit',
-      hour12: false,
-      timeZone: timezone
+      hour12: false
     }));
-    
     const nextHour = (localHour + 1) % 24;
 
+    // Parse API times directly as local time (no conversion needed)
     const adjustedHourlyData = weatherData.forecast.forecastday[0].hour.map(hour => {
-      const utcDate = new Date(hour.time);
-      const localHour = utcDate.toLocaleString('en-US', {
-        timeZone: timezone,
-        hour: '2-digit',
-        hour12: false
-      }).split(':')[0];
+      // Extract hour directly from API time string (format: "YYYY-MM-DD HH:MM")
+      const apiHour = parseInt(hour.time.split(' ')[1].split(':')[0]);
       
       return {
         ...hour,
-        local_hour: parseInt(localHour),
-        local_time: utcDate.toLocaleTimeString('en-US', {
-          timeZone: timezone,
-          hour12: true
-        })
+        local_hour: apiHour,
+        local_time: `${apiHour % 12 || 12}${apiHour >= 12 ? 'PM' : 'AM'}`
       };
     });
 
@@ -187,82 +207,96 @@ async function sendWeatherUpdateForSubscription(subscription, location) {
       throw new Error(`Could not find data for hours ${localHour} and ${nextHour}`);
     }
 
-    const activeAlerts = weatherData.alerts?.alert || [];
-
-    // Send to only this specific subscription
-    await sendSingleNotification(subscription, location, currentData, nextData, activeAlerts, timezone);
+    await sendSingleNotification(subscription, location, currentData, nextData, weatherData.alerts?.alert || [], timezone);
   } catch (err) {
-    console.error(`Failed to send update for ${location}:`, err);
+    console.error(`Update failed for ${location}:`, err);
     await sendNotification(subscription, {
       title: "Weather Update Failed",
-      body: `Couldn't get latest weather for ${location.split(',')[0]}`,
+      body: `Couldn't get weather for ${location.split(',')[0]}`,
       icon: '/icons/error.png'
     });
   }
 }
 
-async function sendSingleNotification(subscription, location, currentHourData, nextHourData, alerts, timezone) {
-  const formatHourOnly = (date, tz) => {
-    const timeStr = date.toLocaleTimeString('en-US', { 
-      timeZone: tz,
-      hour: 'numeric',
-      hour12: true 
-    });
-    return timeStr.replace(/:00$/, '').replace(/:\d+ /, ' ');
-  };
+function debugTimeConversion(weatherData) {
+  const timezone = weatherData.location.tz_id;
+  console.log('=== TIME CONVERSION DEBUG ===');
+  console.log('Location:', weatherData.location.name, 'Timezone:', timezone);
+  console.log('Current UTC time:', new Date().toISOString());
+  
+  // Check first 3 hourly entries
+  weatherData.forecast.forecastday[0].hour.slice(0, 3).forEach(hour => {
+    const utcDate = new Date(hour.time);
+    console.log(`---`);
+    console.log('API time field:', hour.time);
+    console.log('As UTC:', utcDate.toISOString());
+    console.log('As local time:', utcDate.toLocaleString('en-US', { timeZone: timezone }));
+    console.log('Local hour:', parseInt(utcDate.toLocaleString('en-US', { 
+      timeZone: timezone, 
+      hour: '2-digit', 
+      hour12: false 
+    })));
+  });
+}
 
-  const currentTime = formatHourOnly(new Date(currentHourData.time), timezone);
-  const nextTime = formatHourOnly(new Date(nextHourData.time), timezone);
+async function sendSingleNotification(subscription, location, currentData, nextData, alerts, timezone) {
+  // Format times directly from API data (already in local time)
+  const currentHour = parseInt(currentData.time.split(' ')[1].split(':')[0]);
+  const nextHour = parseInt(nextData.time.split(' ')[1].split(':')[0]);
+  
+  const currentPeriod = currentHour >= 12 ? 'PM' : 'AM';
+  const nextPeriod = nextHour >= 12 ? 'PM' : 'AM';
+  
+  const currentDisplayHour = currentHour % 12 || 12;
+  const nextDisplayHour = nextHour % 12 || 12;
+  
+  const currentTime = `${currentDisplayHour} ${currentPeriod}`;
+  const nextTime = `${nextDisplayHour} ${nextPeriod}`;
 
   // Current conditions notification
-  const currentNotification = {
+  await sendNotification(subscription, {
     title: `⏱️ ${currentTime} Weather (${location.split(',')[0]})`,
-    body: `${currentHourData.temp_c}°C, ${currentHourData.condition.text}` +
-          `\n☁️ Cloud Cover: ${currentHourData.cloud}%` +
-          `\n☔ Rain chance: ${currentHourData.chance_of_rain}%` +
-          `\n🌬️ Wind: ${currentHourData.wind_kph} kph ${currentHourData.wind_dir}` +
-          `\n☀️ UV Index: ${currentHourData.uv}`,
-    icon: currentHourData.condition.icon,
-    data: {
-      type: 'current_weather',
-      location: location,
-      time: currentTime
+    body: `${currentData.temp_c}°C, ${currentData.condition.text}` +
+          `\n☁️ Cloud: ${currentData.cloud}%` +
+          `\n☔ Rain: ${currentData.chance_of_rain}%` +
+          `\n🌬️ Wind: ${currentData.wind_kph} kph ${currentData.wind_dir}`,
+    icon: currentData.condition.icon,
+    data: { 
+      type: 'current_weather', 
+      location,
+      time: currentTime,
+      timezone // Include timezone in notification data
     }
-  };
+  });
 
   // Forecast notification
-  const forecastNotification = {
+  await sendNotification(subscription, {
     title: `🔮 ${nextTime} Forecast (${location.split(',')[0]})`,
-    body: `Expected: ${nextHourData.temp_c}°C, ${nextHourData.condition.text}` +
-          `\n☁️ Cloud Cover: ${nextHourData.cloud}%` +
-          `\n☔ Rain chance: ${nextHourData.chance_of_rain}%` +
-          `\n🌬️ Wind: ${nextHourData.wind_kph} kph ${nextHourData.wind_dir}` +
-          `\n☀️ UV Index: ${nextHourData.uv}`,
-    icon: nextHourData.condition.icon,
-    data: {
-      type: 'forecast',
-      location: location,
-      time: nextTime
+    body: `Expected: ${nextData.temp_c}°C, ${nextData.condition.text}` +
+          `\n☁️ Cloud: ${nextData.cloud}%` +
+          `\n☔ Rain: ${nextData.chance_of_rain}%` +
+          `\n🌬️ Wind: ${nextData.wind_kph} kph ${nextData.wind_dir}`,
+    icon: nextData.condition.icon,
+    data: { 
+      type: 'forecast', 
+      location, 
+      time: nextTime,
+      timezone // Include timezone in notification data
     }
-  };
+  });
 
-  // Send both notifications to this specific subscription
-  await sendNotification(subscription, currentNotification);
-  await sendNotification(subscription, forecastNotification);
-  
-  // Send alert notifications if any
-  if (alerts.length > 0) {
-    for (const alert of alerts) {
-      const alertNotification = createAlertNotification(alert, location);
-      await sendNotification(subscription, alertNotification);
-    }
+  // Send alerts if any
+  for (const alert of alerts) {
+    await sendNotification(subscription, createAlertNotification(alert, location));
   }
 
-  // Update last notified time for this subscription only
-  const now = new Date();
+  // Update last notified time
   await subscriptionsCollection.updateOne(
     { endpoint: subscription.endpoint },
-    { $set: { lastNotified: now, nextNotificationTime: calculateNextNotificationTime(now, timezone) } }
+    { $set: { 
+      lastNotified: new Date(),
+      nextNotificationTime: calculateNextNotificationTime(new Date(), timezone)
+    }}
   );
 }
 
