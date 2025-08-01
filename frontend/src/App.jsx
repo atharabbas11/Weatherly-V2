@@ -292,6 +292,35 @@ function App() {
     }
   }, []);
 
+  useEffect(() => {
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+    const checkForIOSUpdates = async () => {
+      const savedLocation = localStorage.getItem('iosNotificationLocation');
+      if (!savedLocation) return;
+      
+      try {
+        const response = await axios.get(`${backendUrl}/api/weather/check-update`, {
+          params: { location: savedLocation }
+        });
+        
+        if (response.data.updated) {
+          // Show in-app notification since push won't work
+          toast.custom((t) => (
+            <div className="bg-blue-100 p-4 rounded-lg shadow-lg">
+              <p>New weather data available for {savedLocation.split(',')[0]}</p>
+            </div>
+          ));
+        }
+      } catch (err) {
+        console.error('iOS update check failed', err);
+      }
+    };
+    
+    const interval = setInterval(checkForIOSUpdates, 30 * 60 * 1000); // Every 30 mins
+    return () => clearInterval(interval);
+  }
+}, []);
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-blue-300 dark:from-gray-800 dark:to-gray-900 p-6 transition-colors duration-300">
       <div className="max-w-3xl mx-auto space-y-6">
