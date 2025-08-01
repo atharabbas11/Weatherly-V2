@@ -37,6 +37,7 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
   const hours12 = hours24 % 12 || 12;
   const formattedLocalTime = `${String(hours12).padStart(2, '0')}:${minutes} ${ampm}`;
 
+  
   // Define helper functions first
   const formatLocalTime = (timeString, timezone) => {
     return new Date(timeString).toLocaleTimeString('en-US', {
@@ -79,6 +80,7 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
   console.log(`Next local hour: ${nextLocalHour}`);
   console.log('Current data:', currentData);
   console.log('Next data:', nextData);
+  console.log('All hourly data with local hours:');
 
 
   // Hourly Weather Slider
@@ -153,44 +155,6 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
     subscribedLocation: null
   });
 
-  // const renderNotificationToggle = () => {
-  //   if (!('Notification' in window)) return null;
-
-  //   // Check if we're subscribed to THIS location
-  //   const currentLocation = `${location.name},${location.region},${location.country}`.replace(/\s*,\s*/g, ',');
-  //   const isSubscribedToCurrentLocation = subscriptionData.isSubscribed && 
-  //     subscriptionData.subscribedLocation === currentLocation;
-
-  //   return (
-  //     <div className="notification-controls">
-  //       <button
-  //         onClick={isSubscribedToCurrentLocation ? unsubscribeFromNotifications : subscribeToNotifications}
-  //         className={`notification-btn ${isSubscribedToCurrentLocation ? 'active' : ''}`}
-  //       >
-  //         {isSubscribedToCurrentLocation ? (
-  //           <>
-  //             <span className="icon">🔔</span>
-  //             Receiving {location.name} Updates
-  //           </>
-  //         ) : (
-  //           <>
-  //             <span className="icon">🔕</span>
-  //             Get 2-Hour Weather Alerts
-  //           </>
-  //         )}
-  //       </button>
-        
-  //       {isSubscribedToCurrentLocation && (
-  //         <div className="notification-info">
-  //           <p>Next update at ~{getNextNotificationTime()}</p>
-  //           <p>Location: {location.name}, {location.region}</p>
-  //         </div>
-  //       )}
-  //     </div>
-  //   );
-  // };
-
-
   const renderNotificationToggle = () => {
   if (!('Notification' in window)) return null;
 
@@ -231,62 +195,6 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
   );
 };
 
-  // const renderNotificationToggle = () => {
-  //   if (!('Notification' in window)) return null;
-
-  //   // Check if we're subscribed to THIS location
-  //   const currentLocation = `${location.name},${location.region},${location.country}`.replace(/\s*,\s*/g, ',');
-  //   const isSubscribedToCurrentLocation = subscriptionData.isSubscribed && 
-  //     subscriptionData.subscribedLocation === currentLocation;
-
-  //   // Format next notification time nicely
-  //   const formatNextNotificationTime = () => {
-  //     if (!subscriptionData.isSubscribed) return '';
-      
-  //     try {
-  //       const nextTime = getNextNotificationTime(location.tz_id);
-  //       // Remove minutes from the display
-  //       return nextTime.replace(/:[\d]{2}\s/, ' ');
-  //     } catch (e) {
-  //       return '';
-  //     }
-  //   };
-
-  //   return (
-  //     <div className="notification-controls bg-blue-50 dark:bg-gray-700 p-3 rounded-lg border border-blue-200 dark:border-gray-600">
-  //       <button
-  //         onClick={isSubscribedToCurrentLocation ? unsubscribeFromNotifications : subscribeToNotifications}
-  //         className={`notification-btn flex items-center justify-center w-full py-2 px-4 rounded-md transition-colors ${
-  //           isSubscribedToCurrentLocation 
-  //             ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800'
-  //             : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800'
-  //         }`}
-  //       >
-  //         {isSubscribedToCurrentLocation ? (
-  //           <>
-  //             <span className="icon mr-2">🔔</span>
-  //             <span className="font-medium">Receiving Updates for {location.name}</span>
-  //           </>
-  //         ) : (
-  //           <>
-  //             <span className="icon mr-2">🔕</span>
-  //             <span className="font-medium">Get 2-Hour Weather Alerts</span>
-  //           </>
-  //         )}
-  //       </button>
-        
-  //       {isSubscribedToCurrentLocation && (
-  //         <div className="notification-info mt-2 text-center text-sm text-gray-600 dark:text-gray-300">
-  //           <p>Next update at <span className="font-medium">{formatNextNotificationTime()}</span></p>
-  //           <p>Location: <span className="font-medium">{location.name}, {location.region}</span></p>
-  //         </div>
-  //       )}
-  //     </div>
-  //   );
-  // };
-
-  // Enhanced subscribe function
-  
   const subscribeToNotifications = async () => {
     try {
       // console.group('Subscription Process');
@@ -458,33 +366,6 @@ const WeatherCard = ({ weather, onSave, isSaved }) => {
 
     checkAndRestoreSubscription();
   }, []);
-
-  // Update getNextNotificationTime
-  // const getNextNotificationTime = (timezone) => {
-  //   const now = new Date();
-  //   const localHour = parseInt(now.toLocaleString('en-US', {
-  //     hour: 'numeric',
-  //     hour12: false,
-  //     timeZone: timezone
-  //   }).split(' ')[0]);
-    
-  //   const nextNotificationHour = localHour + (2 - (localHour % 2));
-    
-  //   const nextDate = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
-  //   nextDate.setHours(nextNotificationHour, 0, 0, 0);
-    
-  //   if (nextDate < now) {
-  //     nextDate.setHours(nextDate.getHours() + 2);
-  //   }
-    
-  //   return nextDate.toLocaleTimeString([], { 
-  //     hour: '2-digit', 
-  //     minute: '2-digit',
-  //     hour12: true,
-  //     timeZone: timezone
-  //   });
-  // };
-
 
   const getNextNotificationTime = () => {
     if (!subscriptionData.isSubscribed || !subscriptionData.subscribedLocation) return '';
